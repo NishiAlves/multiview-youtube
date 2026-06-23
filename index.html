@@ -246,8 +246,9 @@
     <button class="btn btn-secondary" title="Retroceder 10s" onclick="seekAll(-10)">⏪ 10s</button>
     <button class="btn btn-secondary" title="Avançar 10s" onclick="seekAll(10)">10s ⏩</button>
     <div class="divider"></div>
-    <button class="btn btn-mute" id="btnMute" onclick="toggleMute()">🔇</button>
+    <button class="btn btn-mute" id="btnMute" onclick="toggleMute()">Mutar todos</button>
     <div class="volume-wrap">
+      <span id="volumeIcon">🔊</span>
       <input type="range" id="volumeSlider" min="0" max="100" value="100" oninput="setVolume(this.value)" title="Volume" />
       <span id="volumeLabel">100%</span>
     </div>
@@ -488,14 +489,24 @@
     iframes.forEach(f => cmd(f, 'setVolume', [currentVolume]));
     if (currentVolume > 0 && isMuted) {
       isMuted = false;
-      document.getElementById('btnMute').textContent = '🔇';
+      document.getElementById('btnMute').textContent = 'Mutar todos';
     }
+    updateVolumeIcon();
+  }
+
+  function updateVolumeIcon() {
+    const icon = document.getElementById('volumeIcon');
+    if (!icon) return;
+    if (isMuted || currentVolume === 0) icon.textContent = '🔇';
+    else if (currentVolume < 50) icon.textContent = '🔉';
+    else icon.textContent = '🔊';
   }
 
   // ── Mudo / Som geral ──────────────────────────────────────────────────────
   function toggleMute() {
     isMuted = !isMuted;
-    document.getElementById('btnMute').textContent = isMuted ? '🔊' : '🔇';
+    document.getElementById('btnMute').textContent = isMuted ? 'Desmutar' : 'Mutar todos';
+    updateVolumeIcon();
     iframes.forEach(f => cmd(f, isMuted ? 'mute' : 'unMute'));
     if (!isMuted && soloIndex !== null) clearSolo();
   }
