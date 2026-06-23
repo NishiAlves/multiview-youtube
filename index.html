@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MultiView YouTube</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #0f0f0f;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 6px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      flex-shrink: 0;
+      gap: 6px;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      white-space: nowrap;
+      justify-self: start;
+    }
+    header h1 span { color: #FF0000; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: nowrap;
+      justify-self: center;
+    }
+
+    .btn {
+      background: #FF0000;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 11px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #cc0000; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+    .btn:disabled:hover { background: #FF0000; }
+
+    .btn-secondary { background: #2a2a2a; border: 1px solid #444; }
+    .btn-secondary:hover { background: #3a3a3a; border-color: #666; }
+    .btn-secondary:disabled:hover { background: #2a2a2a; border-color: #444; }
+
+    .btn-slot {
+      background: #1e3a1e;
+      border: 1px solid #2e6b2e;
+      color: #6dca6d;
+      font-size: 1rem;
+      padding: 4px 10px;
+    }
+    .btn-slot:hover { background: #254d25; border-color: #4a9e4a; }
+    .btn-slot.remove { background: #3a1e1e; border-color: #6b2e2e; color: #ca6d6d; }
+    .btn-slot.remove:hover { background: #4d2525; border-color: #9e4a4a; }
+    .btn-slot:disabled:hover { background: #1e3a1e; border-color: #2e6b2e; }
+    .btn-slot.remove:disabled:hover { background: #3a1e1e; border-color: #6b2e2e; }
+
+    .btn-mute { background: #333; border: none; }
+    .btn-mute:hover { background: #444; }
+
+    /* botão solo na barra */
+    .btn-solo {
+      background: #2a2a2a;
+      border: 1px solid #555;
+      color: #aaa;
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .btn-solo:hover { background: #3a3a3a; border-color: #FFC800; color: #FFC800; }
+    .btn-solo.active {
+      background: rgba(255,200,0,0.15);
+      border-color: #FFC800;
+      color: #FFC800;
+    }
+
+    .solo-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .solo-label {
+      font-size: 0.72rem;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    .divider {
+      width: 1px;
+      height: 20px;
+      background: #444;
+      flex-shrink: 0;
+    }
+
+    .volume-wrap {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+    .volume-wrap input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 70px;
+      height: 4px;
+      background: #444;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .volume-wrap input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #FF0000;
+      cursor: pointer;
+    }
+
+    .grid {
+      flex: 1;
+      display: grid;
+      gap: 8px;
+      min-height: 0;
+    }
+    .grid[data-count="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    .grid[data-count="2"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+    .grid[data-count="3"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .grid[data-count="3"] .cell:nth-child(3) { grid-column: 1 / -1; }
+    .grid[data-count="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+    .cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      flex-shrink: 0;
+      overflow: hidden;
+      max-height: 34px;
+      opacity: 1;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+    }
+    body.playing .input-row {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .input-row label { font-size: 0.75rem; color: #888; white-space: nowrap; }
+
+    .input-row input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #fff;
+      padding: 5px 9px;
+      font-size: 0.82rem;
+      outline: none;
+      transition: border-color 0.2s;
+      min-width: 0;
+    }
+    .input-row input:focus { border-color: #FF0000; }
+    .input-row input::placeholder { color: #555; }
+
+    .slot {
+      flex: 1;
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+    .slot iframe { width: 100%; height: 100%; border: none; display: block; }
+
+    .placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      height: 100%;
+      color: #555;
+    }
+    .placeholder button {
+      background: #2a2a2a;
+      border: 2px dashed #444;
+      color: #888;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      font-size: 1.8rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .placeholder button:hover { border-color: #FF0000; color: #FF0000; }
+    .placeholder span { font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Multi<span>View</span> YouTube</h1>
+  <div class="controls">
+    <button class="btn" id="btnPlayPause" onclick="togglePlayPause()">▶ Play</button>
+    <button class="btn btn-secondary" title="Retroceder 10s" onclick="seekAll(-10)">⏪ 10s</button>
+    <button class="btn btn-secondary" title="Avançar 10s" onclick="seekAll(10)">10s ⏩</button>
+    <div class="divider"></div>
+    <button class="btn btn-mute" id="btnMute" onclick="toggleMute()">🔇</button>
+    <div class="volume-wrap">
+      <input type="range" id="volumeSlider" min="0" max="100" value="100" oninput="setVolume(this.value)" title="Volume" />
+      <span id="volumeLabel">100%</span>
+    </div>
+    <div class="divider"></div>
+    <span class="solo-label">Som em:</span>
+    <div class="solo-group" id="soloGroup"></div>
+    <div class="divider"></div>
+    <button class="btn btn-slot remove" id="btnRemove" onclick="removeSlot()" title="Remover último vídeo">−</button>
+    <button class="btn btn-slot" id="btnAdd" onclick="addSlot()" title="Adicionar vídeo">+</button>
+  </div>
+</header>
+
+<div class="grid" id="grid" data-count="2"></div>
+
+<script>
+  const MAX_SLOTS = 4;
+  const MIN_SLOTS = 2;
+  let slotCount = 2;
+
+  const iframes = [];
+  const currentTimes = [];
+  let isPlaying = false;
+  let isMuted = false;
+  let soloIndex = null;
+  let currentVolume = 100;
+
+  window.addEventListener('message', e => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.event === 'infoDelivery' && data.info?.currentTime !== undefined) {
+        const idx = iframes.findIndex(f => f && f.contentWindow === e.source);
+        if (idx !== -1) currentTimes[idx] = data.info.currentTime;
+      }
+    } catch(_) {}
+  });
+
+  const grid = document.getElementById('grid');
+  const soloGroup = document.getElementById('soloGroup');
+
+  // ── Reconstrói os botões Solo na barra conforme slotCount ─────────────────
+  function rebuildSoloBtns() {
+    soloGroup.innerHTML = '';
+    for (let i = 0; i < slotCount; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-solo' + (soloIndex === i ? ' active' : '');
+      btn.id = `solo-${i}`;
+      btn.textContent = `V${i + 1}`;
+      btn.title = `Solo Vídeo ${i + 1}`;
+      btn.onclick = () => toggleSolo(i);
+      soloGroup.appendChild(btn);
+    }
+  }
+
+  // ── Cria uma célula (input + slot) para o índice i ────────────────────────
+  function createCell(i) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.id = `cell-${i}`;
+
+    const row = document.createElement('div');
+    row.className = 'input-row';
+    row.id = `row-${i}`;
+    row.innerHTML = `
+      <label>Vídeo ${i + 1}</label>
+      <input id="input-${i}" type="text" placeholder="Cole a URL do YouTube aqui..." />
+    `;
+    cell.appendChild(row);
+
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.id = `slot-${i}`;
+
+    const ph = document.createElement('div');
+    ph.className = 'placeholder';
+    ph.id = `ph-${i}`;
+    ph.innerHTML = `<button onclick="focusInput(${i})">+</button><span>Vídeo ${i + 1}</span>`;
+    slot.appendChild(ph);
+
+    cell.appendChild(slot);
+    return cell;
+  }
+
+  function attachInputListeners(i) {
+    const inp = document.getElementById(`input-${i}`);
+    if (!inp) return;
+    inp.addEventListener('blur', () => handleLoad(i));
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  }
+
+  // ── Inicializa slots ───────────────────────────────────────────────────────
+  function initSlots(count) {
+    grid.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      grid.appendChild(createCell(i));
+      setTimeout(() => attachInputListeners(i), 0);
+    }
+    grid.dataset.count = count;
+    rebuildSoloBtns();
+    updateSlotButtons();
+  }
+
+  // ── Adicionar slot ────────────────────────────────────────────────────────
+  function addSlot() {
+    if (slotCount >= MAX_SLOTS) return;
+    const i = slotCount;
+    slotCount++;
+    iframes[i] = null;
+    currentTimes[i] = 0;
+
+    grid.appendChild(createCell(i));
+    grid.dataset.count = slotCount;
+    attachInputListeners(i);
+
+    rebuildSoloBtns();
+    updateSlotButtons();
+    saveAll();
+  }
+
+  // ── Remover último slot ───────────────────────────────────────────────────
+  function removeSlot() {
+    if (slotCount <= MIN_SLOTS) return;
+    slotCount--;
+    const i = slotCount;
+
+    if (soloIndex === i) clearSolo();
+
+    if (iframes[i]) { iframes[i].remove(); iframes[i] = null; }
+    iframes.length = slotCount;
+    currentTimes.length = slotCount;
+
+    const cell = document.getElementById(`cell-${i}`);
+    if (cell) cell.remove();
+
+    grid.dataset.count = slotCount;
+    rebuildSoloBtns();
+    updateSlotButtons();
+    saveAll();
+  }
+
+  function updateSlotButtons() {
+    document.getElementById('btnAdd').disabled = slotCount >= MAX_SLOTS;
+    document.getElementById('btnRemove').disabled = slotCount <= MIN_SLOTS;
+  }
+
+  // ── Extrai video ID ───────────────────────────────────────────────────────
+  function extractVideoId(url) {
+    url = url.trim();
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+      /[?&]v=([A-Za-z0-9_-]{11})/,
+    ];
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m) return m[1];
+    }
+    if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
+    return null;
+  }
+
+  function cmd(iframe, func, args) {
+    if (!iframe) return;
+    iframe.contentWindow.postMessage(
+      JSON.stringify({ event: 'command', func, args: args || [] }), '*'
+    );
+  }
+
+  function handleLoad(i) {
+    const inp = document.getElementById(`input-${i}`);
+    if (!inp || inp.value.trim() === '') return;
+    const id = extractVideoId(inp.value);
+    if (!id) return;
+    loadVideo(i, id);
+    saveAll();
+  }
+
+  function loadVideo(i, videoId) {
+    const slot = document.getElementById(`slot-${i}`);
+    if (!slot) return;
+
+    const old = document.getElementById(`player-${i}`);
+    if (old) old.remove();
+    iframes[i] = null;
+
+    document.getElementById(`ph-${i}`).style.display = 'none';
+
+    const iframe = document.createElement('iframe');
+    iframe.id = `player-${i}`;
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.allowFullscreen = true;
+    iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&rel=0&modestbranding=1`;
+    slot.appendChild(iframe);
+
+    iframes[i] = iframe;
+
+    iframe.addEventListener('load', () => {
+      iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+      if (isMuted || (soloIndex !== null && soloIndex !== i)) cmd(iframe, 'mute');
+      if (currentVolume !== 100) cmd(iframe, 'setVolume', [currentVolume]);
+    });
+  }
+
+  function focusInput(i) {
+    const inp = document.getElementById(`input-${i}`);
+    if (inp) inp.focus();
+  }
+
+  // ── Play / Pause todos ────────────────────────────────────────────────────
+  function togglePlayPause() {
+    isPlaying = !isPlaying;
+    document.getElementById('btnPlayPause').textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+    document.body.classList.toggle('playing', isPlaying);
+    iframes.forEach((f, i) => {
+      if (!f) return;
+      const inp = document.getElementById(`input-${i}`);
+      const hasUrl = inp && inp.value.trim() !== '';
+      if (isPlaying && !hasUrl) {
+        f.remove(); iframes[i] = null;
+        const ph = document.getElementById(`ph-${i}`);
+        if (ph) ph.style.display = '';
+      } else {
+        cmd(f, isPlaying ? 'playVideo' : 'pauseVideo');
+      }
+    });
+  }
+
+  // ── Seek ±10s ─────────────────────────────────────────────────────────────
+  function seekAll(delta) {
+    iframes.forEach((f, i) => {
+      if (!f) return;
+      cmd(f, 'seekTo', [Math.max(0, (currentTimes[i] || 0) + delta), true]);
+    });
+  }
+
+  // ── Volume geral ──────────────────────────────────────────────────────────
+  function setVolume(val) {
+    currentVolume = parseInt(val);
+    document.getElementById('volumeLabel').textContent = currentVolume + '%';
+    iframes.forEach(f => cmd(f, 'setVolume', [currentVolume]));
+    if (currentVolume > 0 && isMuted) {
+      isMuted = false;
+      document.getElementById('btnMute').textContent = '🔇';
+    }
+  }
+
+  // ── Mudo / Som geral ──────────────────────────────────────────────────────
+  function toggleMute() {
+    isMuted = !isMuted;
+    document.getElementById('btnMute').textContent = isMuted ? '🔊' : '🔇';
+    iframes.forEach(f => cmd(f, isMuted ? 'mute' : 'unMute'));
+    if (!isMuted && soloIndex !== null) clearSolo();
+  }
+
+  // ── Solo ──────────────────────────────────────────────────────────────────
+  function toggleSolo(i) {
+    if (soloIndex === i) { clearSolo(); return; }
+    soloIndex = i;
+    iframes.forEach((f, idx) => cmd(f, idx === i ? 'unMute' : 'mute'));
+    updateSoloBtns();
+  }
+
+  function clearSolo() {
+    soloIndex = null;
+    iframes.forEach(f => cmd(f, isMuted ? 'mute' : 'unMute'));
+    updateSoloBtns();
+  }
+
+  function updateSoloBtns() {
+    for (let i = 0; i < slotCount; i++) {
+      const btn = document.getElementById(`solo-${i}`);
+      if (btn) btn.classList.toggle('active', soloIndex === i);
+    }
+  }
+
+  // ── Persistência ──────────────────────────────────────────────────────────
+  function saveAll() {
+    const data = { count: slotCount, ids: [] };
+    for (let i = 0; i < slotCount; i++) {
+      const inp = document.getElementById(`input-${i}`);
+      data.ids.push(inp ? (extractVideoId(inp.value) || '') : '');
+    }
+    localStorage.setItem('multiview_state', JSON.stringify(data));
+  }
+
+  (function loadSaved() {
+    try {
+      const data = JSON.parse(localStorage.getItem('multiview_state') || 'null');
+      const savedCount = data?.count || 2;
+      const savedIds = data?.ids || [];
+
+      slotCount = Math.min(Math.max(savedCount, MIN_SLOTS), MAX_SLOTS);
+      initSlots(slotCount);
+
+      savedIds.forEach((id, i) => {
+        if (id && i < slotCount) {
+          document.getElementById(`input-${i}`).value = `https://www.youtube.com/watch?v=${id}`;
+          loadVideo(i, id);
+        }
+      });
+    } catch(e) {
+      initSlots(2);
+    }
+  })();
+</script>
+</body>
+</html>
